@@ -39,7 +39,7 @@ Partial Class Form1
     Friend WithEvents btnViewAdminResults As System.Windows.Forms.Button
     Friend WithEvents btnPublishResults As System.Windows.Forms.Button
     Friend WithEvents btnBackFromAdmin As System.Windows.Forms.Button
-
+    Friend WithEvents PanelChart As System.Windows.Forms.Panel
     Friend WithEvents PanelSuccess As System.Windows.Forms.Panel
     Friend WithEvents lblSuccessTitle As System.Windows.Forms.Label
     Friend WithEvents lblToken As System.Windows.Forms.Label
@@ -107,13 +107,16 @@ Partial Class Form1
         Me.btnCastVote = New System.Windows.Forms.Button() With {.Text = "Cast Final Vote", .Location = New System.Drawing.Point(500, 550), .Size = New System.Drawing.Size(250, 50), .BackColor = colorBtnBlue, .ForeColor = colorText, .FlatStyle = System.Windows.Forms.FlatStyle.Flat, .Font = New System.Drawing.Font("Segoe UI", 14, System.Drawing.FontStyle.Bold)}
         Me.PanelVote.Controls.AddRange(New System.Windows.Forms.Control() {Me.flowBallot, Me.btnCastVote})
 
-        ' --- RESULTS PANEL (Public) ---
-        Me.PanelResults = New System.Windows.Forms.Panel() With {.Dock = System.Windows.Forms.DockStyle.Fill, .Visible = False}
+               ' --- RESULTS PANEL (Public) ---
+        Me.PanelResults = New System.Windows.Forms.Panel() With {.Dock = System.Windows.Forms.DockStyle.Fill, .Visible = False, .BackColor = System.Drawing.Color.FromArgb(13, 17, 23)}
         Dim lblResTitle As New System.Windows.Forms.Label() With {.Text = "Official Election Results", .ForeColor = colorText, .Font = fontTitle, .Location = New System.Drawing.Point(50, 20), .Size = New System.Drawing.Size(400, 40)}
-        Me.lstResults = New System.Windows.Forms.ListBox() With {.Location = New System.Drawing.Point(50, 70), .Size = New System.Drawing.Size(700, 450), .BackColor = colorInputBg, .ForeColor = colorText, .Font = New System.Drawing.Font("Consolas", 12), .BorderStyle = System.Windows.Forms.BorderStyle.None}
+        
+        ' The Chart Panel
+        Me.PanelChart = New System.Windows.Forms.Panel() With {.Location = New System.Drawing.Point(50, 70), .Size = New System.Drawing.Size(700, 450), .BackColor = System.Drawing.Color.FromArgb(22, 27, 34), .AutoScroll = True}
+        
         Me.btnBackFromResults = New System.Windows.Forms.Button() With {.Text = "Back to Login", .Location = New System.Drawing.Point(50, 540), .Size = New System.Drawing.Size(150, 40), .BackColor = colorBtnBlue, .ForeColor = colorText, .FlatStyle = System.Windows.Forms.FlatStyle.Flat}
-        Me.PanelResults.Controls.AddRange(New System.Windows.Forms.Control() {lblResTitle, Me.lstResults, Me.btnBackFromResults})
-
+        
+        Me.PanelResults.Controls.AddRange(New System.Windows.Forms.Control() {lblResTitle, Me.PanelChart, Me.btnBackFromResults})
         ' --- ADMIN PANEL ---
         Me.PanelAdmin = New System.Windows.Forms.Panel() With {.Dock = System.Windows.Forms.DockStyle.Fill, .Visible = False}
         Dim lblAdminTitle As New System.Windows.Forms.Label() With {.Text = "IEBC Admin Portal", .ForeColor = System.Drawing.Color.Gold, .Font = fontTitle, .Location = New System.Drawing.Point(50, 20), .Size = New System.Drawing.Size(300, 40)}

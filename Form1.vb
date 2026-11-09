@@ -3,6 +3,7 @@ Imports System.Drawing
 Imports System.Windows.Forms
 Imports System.IO
 Imports Microsoft.VisualBasic
+Imports System.Drawing.Drawing2D
 
 Public Class Form1
     Private connectionString As String = "server=localhost;user=root;password=Maina@411;database=election_db;"
@@ -12,6 +13,11 @@ Public Class Form1
     Private currentUserIDNumber As String = ""
     Private selectedChoices As New Dictionary(Of String, Integer)()
     Private isAdminLoggedIn As Boolean = False
+
+
+        ' Variables to hold the chart data
+    Private chartBarData As New List(Of Tuple(Of String, Integer))()
+    Private chartPieData As New List(Of Tuple(Of String, Integer))()
 
     Private Function GetConnection() As MySqlConnection
         Return New MySqlConnection(connectionString)
@@ -398,73 +404,67 @@ Public Class Form1
 
     ' ================= RESULTS LOGIC =================
     Private Sub LoadResults()
-        lstResults.Items.Clear()
-        
+        ' Clear previous data
+        chartBarData.Clear()
+        chartPieData.Clear()
+
+        ' Check if results are published
         If Not isAdminLoggedIn Then
             Using conn = GetConnection()
                 conn.Open()
                 Using cmd As New MySqlCommand("SELECT SettingValue FROM Settings WHERE SettingKey = 'PublishResults'", conn)
                     If cmd.ExecuteScalar().ToString() <> "true" Then
-                        lstResults.Items.Add("Results are currently hidden by the IEBC.")
-                        lstResults.Items.Add("Please check back later.")
+                        Dim lblHidden As New Label() With {.Text = "Results are currently hidden by the IEBC.", .ForeColor = Color.LightGray, .Font = New Font("Segoe UI", 16), .Location = New Point(100, 150), .AutoSize = True}
+                        PanelChart.Controls.Clear()
+                        PanelChart.Controls.Add(lblHidden)
                         Return
                     End If
                 End Using
             End Using
         End If
 
-        lstResults.Items.Add("--- OFFICIAL RESULTS ---")
+        PanelChart.Controls.Clear()
 
+        ' Fetch Data for Bar Chart and Line Graph
         Try
             Using conn = GetConnection()
                 conn.Open()
-                Dim query As String = "SELECT c.Position, c.Name, c.Party, COUNT(v.VoteID) AS VoteCount " &
+                Dim query As String = "SELECT c.Name, COUNT(v.VoteID) AS VoteCount " &
                                       "FROM Candidates c LEFT JOIN Votes v ON c.CandidateID = v.CandidateID " &
-                                      "GROUP BY c.CandidateID, c.Position, c.Name, c.Party " &
-                                      "ORDER BY FIELD(c.Position, 'President', 'Member of Parliament', 'Finance Secretary', 'Welfare Representative'), VoteCount DESC"
+                                      "GROUP BY c.CandidateID, c.Name ORDER BY VoteCount DESC"
                 Using cmd As New MySqlCommand(query, conn)
                     Using reader = cmd.ExecuteReader()
-                        Dim currentPos As String = ""
                         While reader.Read()
-                            Dim pos As String = reader("Position").ToString()
-                            
-                            If pos <> currentPos Then
-                                currentPos = pos
-                                lstResults.Items.Add("")
-                                lstResults.Items.Add("=== " & currentPos.ToUpper() & " ===")
-                            End If
-                            
-                            Dim name As String = reader("Name").ToString() & " (" & reader("Party").ToString() & ")"
-                            Dim votes As String = reader("VoteCount").ToString()
-                            
-                            Dim bar As String = New String("█", Math.Min(Convert.ToInt32(votes), 30))
-                            lstResults.Items.Add(name.PadRight(40) & " | " & votes & " votes " & bar)
+                            chartBarData.Add(New Tuple(Of String, Integer)(reader("Name").ToString(), Convert.ToInt32(reader("VoteCount"))))
                         End While
                     End Using
                 End Using
             End Using
         Catch ex As Exception
-            MessageBox.Show("Error loading results: " & ex.Message)
+            MessageBox.Show("Error loading bar data: " & ex.Message)
         End Try
-    End Sub
 
-    Private Sub btnBackFromResults_Click(sender As Object, e As EventArgs) Handles btnBackFromResults.Click
-        PanelResults.Visible = False
-        If isAdminLoggedIn Then
-            PanelAdmin.Visible = True
-        Else
-            PanelLogin.Visible = True
-        End If
-    End Sub
-    Private Sub btnFinish_Click(sender As Object, e As EventArgs) Handles btnFinish.Click
-        ' Hide the success screen
-        PanelSuccess.Visible = False
-        
-        ' Show the login screen again
-        PanelLogin.Visible = True
-        
-        ' Optional: Clear the token text so it doesn't show the old one next time
-        lblToken.Text = "XXXX-XXXX"
+        ' Fetch Data for Pie Chart (Total votes per Position)
+        Try
+            Using conn = GetConnection()
+                conn.Open()
+                Dim query As String = "SELECT c.Position, COUNT(v.VoteID) AS TotalVotes " &
+                                      "FROM Candidates c LEFT JOIN Votes v ON c.CandidateID = v.CandidateID " &
+                                      "GROUP BY c.Position"
+                Using cmd As New MySqlCommand(query, conn)
+                    Using reader = cmd.ExecuteReader()
+                        While reader.Read()
+                            chartPieData.Add(New Tuple(Of String, Integer)(reader("Position").ToString(), Convert.ToInt32(reader("TotalVotes"))))
+                        End While
+                    End Using
+                End Using
+            End Using
+        Catch ex As Exception
+            MessageBox.Show("Error loading pie data: " & ex.Message)
+        End Try
+
+        ' Trigger the drawing of the charts
+        PanelChart.Invalidate()
     End Sub
        Private Sub btnExportResults_Click(sender As Object, e As EventArgs) Handles btnExportResults.Click
         Try
@@ -482,7 +482,99 @@ Public Class Form1
             ShowDarkMessage("Error exporting file: " & ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
         End Try
     End Sub
+    Private Sub PanelChart_Paint(sender As Object, e As PaintEventArgs) Handles PanelChart.Paint
+        Dim g As Graphics = e.Graphics
+        g.SmoothingMode = SmoothingMode.AntiAlias
+        g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
 
+        ' Colors for the charts
+        Dim colors As Color() = {Color.FromArgb(88, 166, 255), Color.FromArgb(35, 134, 54), Color.FromArgb(210, 153, 34), Color.FromArgb(218, 54, 51), Color.FromArgb(163, 113, 247)}
+
+        ' ==========================================
+        ' 1. DRAW BAR CHART (Top Left)
+        ' ==========================================
+        Dim barX As Integer = 20
+        Dim barY As Integer = 30
+        Dim maxBarVotes As Integer = If(chartBarData.Count > 0, Math.Max(chartBarData.Max(Function(x) x.Item2), 1), 1)
+
+        g.DrawString("Vote Distribution", New Font("Segoe UI", 12, FontStyle.Bold), Brushes.Gold, barX, 10)
+
+        For i As Integer = 0 To Math.Min(chartBarData.Count - 1, 4) ' Show top 5 max
+            Dim name As String = chartBarData(i).Item1
+            Dim votes As Integer = chartBarData(i).Item2
+            Dim barWidth As Integer = CInt((votes / maxBarVotes) * 150) ' Max width 150px
+
+            ' Draw Name
+            g.DrawString(name, New Font("Segoe UI", 9), Brushes.LightGray, barX, barY + (i * 25))
+            ' Draw Bar
+            g.FillRectangle(New SolidBrush(colors(i Mod colors.Length)), barX + 100, barY + (i * 25), barWidth, 15)
+            ' Draw Votes
+            g.DrawString(votes.ToString(), New Font("Segoe UI", 9, FontStyle.Bold), Brushes.White, barX + 100 + barWidth + 5, barY + (i * 25))
+        Next
+
+        ' ==========================================
+        ' 2. DRAW PIE CHART (Top Right)
+        ' ==========================================
+        Dim pieX As Integer = 350
+        Dim pieY As Integer = 30
+        Dim pieSize As Integer = 180
+        Dim totalVotes As Integer = If(chartPieData.Count > 0, chartPieData.Sum(Function(x) x.Item2), 1)
+        Dim startAngle As Single = 0
+
+        g.DrawString("Turnout by Position", New Font("Segoe UI", 12, FontStyle.Bold), Brushes.Gold, pieX, 10)
+
+        For i As Integer = 0 To chartPieData.Count - 1
+            Dim posName As String = chartPieData(i).Item1
+            Dim votes As Integer = chartPieData(i).Item2
+            Dim sweepAngle As Single = CSng(votes / totalVotes) * 360.0F
+
+            ' Draw the pie slice
+            g.FillPie(New SolidBrush(colors(i Mod colors.Length)), pieX, pieY, pieSize, pieSize, startAngle, sweepAngle)
+            
+            ' Draw a little legend box
+            g.FillRectangle(New SolidBrush(colors(i Mod colors.Length)), pieX + pieSize + 20, pieY + (i * 25), 15, 15)
+            g.DrawString(posName, New Font("Segoe UI", 8), Brushes.White, pieX + pieSize + 40, pieY + (i * 25))
+
+            startAngle += sweepAngle
+        Next
+
+        ' ==========================================
+        ' 3. DRAW LINE GRAPH (Bottom)
+        ' ==========================================
+        Dim lineX As Integer = 20
+        Dim lineY As Integer = 280
+        Dim lineWidth As Integer = 650
+        Dim lineHeight As Integer = 150
+
+        g.DrawString("Trend of Votes", New Font("Segoe UI", 12, FontStyle.Bold), Brushes.Gold, lineX, lineY - 20)
+        
+        ' Draw Axis Lines
+        g.DrawLine(Pens.Gray, lineX, lineY, lineX, lineY + lineHeight) ' Y axis
+        g.DrawLine(Pens.Gray, lineX, lineY + lineHeight, lineX + lineWidth, lineY + lineHeight) ' X axis
+
+        If chartBarData.Count > 1 Then
+            Dim pointDistance As Integer = lineWidth \ (chartBarData.Count - 1)
+            Dim points As New List(Of Point)()
+
+            For i As Integer = 0 To chartBarData.Count - 1
+                Dim votes As Integer = chartBarData(i).Item2
+                ' Calculate Y position (invert because Y goes down in graphics)
+                Dim ptY As Integer = lineY + lineHeight - CInt((votes / maxBarVotes) * lineHeight)
+                Dim ptX As Integer = lineX + (i * pointDistance)
+                points.Add(New Point(ptX, ptY))
+            Next
+
+            ' Draw the Line
+            If points.Count > 1 Then
+                g.DrawLines(New Pen(Color.FromArgb(88, 166, 255), 3), points.ToArray())
+            End If
+
+            ' Draw the Dots on the line
+            For Each pt In points
+                g.FillEllipse(Brushes.White, pt.X - 4, pt.Y - 4, 8, 8)
+            Next
+        End If
+    End Sub
     ' ================= HELPER FUNCTIONS =================
     ' This MUST be inside the Form1 class!
     Private Sub OnlyAllowNumbers(sender As Object, e As KeyPressEventArgs)

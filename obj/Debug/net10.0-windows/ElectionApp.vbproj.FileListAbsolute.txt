@@ -17,3 +17,4 @@ C:\Users\WEB_WIZZARDS\ElectionManagementSystem\ElectionApp\obj\Debug\net10.0-win
 C:\Users\WEB_WIZZARDS\ElectionManagementSystem\ElectionApp\bin\Debug\net10.0-windows\Microsoft.Extensions.DependencyInjection.Abstractions.dll
 C:\Users\WEB_WIZZARDS\ElectionManagementSystem\ElectionApp\bin\Debug\net10.0-windows\Microsoft.Extensions.Logging.Abstractions.dll
 C:\Users\WEB_WIZZARDS\ElectionManagementSystem\ElectionApp\bin\Debug\net10.0-windows\MySqlConnector.dll
+C:\Users\WEB_WIZZARDS\ElectionManagementSystem\ElectionApp\obj\Debug\net10.0-windows\ElectionApp.sourcelink.json
